@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2c3e50">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Simulador de Ganancias</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f7f7f7;
+      color: #333;
+      font-size: 14px;
+    }
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin: 10px 0;
+    }
+    .main {
+      display: flex;
+      flex-direction: row;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    .left-panel {
+      flex: 1;
+      max-width: 350px;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    .chart-panel {
+      flex: 2;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    .chart-panel canvas {
+      width: 100% !important;
+      height: auto !important;
+      max-height: 500px;
+    }
+    .inputs, .summary {
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .inputs label {
+      display: block;
+      margin: 6px 0 3px;
+      font-weight: bold;
+    }
+    .inputs input {
+      width: 100%;
+      padding: 5px;
+      margin-bottom: 6px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+    }
+    .summary p {
+      margin: 6px 0;
+    }
+    .footer {
+      width: 100%;
+      text-align: center;
+      padding: 8px;
+      font-size: 11px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <h1>Simulador de Ganancias</h1>
+  <div class="main">
+    <div class="left-panel">
+      <div class="inputs">
+        <label for="inversion">Inversión Inicial (CLP)</label>
+        <input type="number" id="inversion" value="213000" />
+
+        <label for="costo">Costo Variable por Cliente (Materiales, CLP)</label>
+        <input type="number" id="costo" value="40000" />
+
+        <label for="fijo">Costo Fijo Mensual (ej: bencina, internet, CLP)</label>
+        <input type="number" id="fijo" value="30000" />
+
+        <label for="precio">Precio de Venta por Cliente (CLP)</label>
+        <input type="number" id="precio" value="100000" />
+
+        <label for="clientes">Instalaciones por Mes</label>
+        <input type="number" id="clientes" value="4" />
+
+        <label for="sueldo">Sueldo Personal Mensual (CLP)</label>
+        <input type="number" id="sueldo" value="200000" />
+      </div>
+      <div class="summary" id="resumen"></div>
+    </div>
+    <div class="chart-panel">
+      <canvas id="grafico"></canvas>
+    </div>
+  </div>
+
+  <div class="summary" style="padding: 0 20px;">
+    <h3>Detalle Mensual</h3>
+    <table id="tablaDatos" style="width: 100%; border-collapse: collapse; font-size: 12px;">
+      <thead>
+        <tr style="background: #eee;">
+          <th>Mes</th>
+          <th>Ingreso</th>
+          <th>Gastos</th>
+          <th>Ganancia Neta</th>
+          <th>Capital Disponible</th>
+          <th>Capital Acumulado</th>
+          <th>Ganancia Acumulada</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="footer">Desarrollado por ChatGPT para ayudarte a emprender 💼</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const ctx = document.getElementById('grafico').getContext('2d');
+    let chart;
+
+    function calcularYActualizar() {
+      const inversion = parseInt(document.getElementById("inversion").value);
+      const costo = parseInt(document.getElementById("costo").value);
+      const fijo = parseInt(document.getElementById("fijo").value);
+      const precio = parseInt(document.getElementById("precio").value);
+      const clientes = parseInt(document.getElementById("clientes").value);
+      const sueldo = parseInt(document.getElementById("sueldo").value);
+
+      const meses = 12;
+      const labels = [];
+      const gananciasNetas = [];
+      const ingresosTotales = [];
+      const gananciaRealMensual = [];
+      const capitalDisponibleAcumulado = [];
+      const gananciaAcumuladaSerie = [];
+      let gananciaRealAcumulada = 0;
+      let gananciaAcumulada = -inversion;
+      let puntoEquilibrioMes = null;
+
+      for (let i = 1; i <= meses; i++) {
+        const ingreso = clientes * precio;
+        const costoVariable = clientes * costo;
+        const gasto = costoVariable + fijo;
+        const gananciaMes = ingreso - gasto;
+        gananciaAcumulada += gananciaMes;
+        gananciaAcumuladaSerie.push(gananciaAcumulada);
+
+        const gananciaReal = gananciaMes - sueldo;
+        gananciaRealMensual.push(gananciaReal);
+
+        gananciaRealAcumulada += gananciaReal;
+        capitalDisponibleAcumulado.push(gananciaRealAcumulada);
+
+        if (puntoEquilibrioMes === null && gananciaAcumulada >= 0) {
+          puntoEquilibrioMes = i;
+        }
+
+        labels.push(`Mes ${i}`);
+        ingresosTotales.push(ingreso);
+        gananciasNetas.push(gananciaMes);
+      }
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Punto de Equilibrio',
+              data: labels.map((_, idx) => idx + 1 === puntoEquilibrioMes ? capitalDisponibleAcumulado[idx] : 0),
+              backgroundColor: 'rgba(52, 152, 219, 0.5)',
+              borderColor: 'rgba(41, 128, 185, 1)',
+              borderWidth: 2,
+              barThickness: 20,
+              yAxisID: 'y',
+              stack: 'equilibrio',
+              order: 0
+            },
+            {
+              label: 'Capital Disponible',
+              data: gananciaRealMensual.map(value => value),
+              backgroundColor: gananciaRealMensual.map(value => value >= 0 ? 'rgba(46, 204, 113, 0.7)' : 'rgba(231, 76, 60, 0.7)'),
+              borderColor: gananciaRealMensual.map(value => value >= 0 ? 'rgba(39, 174, 96, 1)' : 'rgba(192, 57, 43, 1)'),
+              borderWidth: 1
+            },
+            {
+              label: 'Capital Disponible Acumulado',
+              data: capitalDisponibleAcumulado,
+              type: 'line',
+              fill: false,
+              backgroundColor: 'rgba(155, 89, 182, 0.7)',
+              borderColor: 'rgba(142, 68, 173, 1)',
+              borderWidth: 1
+            },
+            {
+              label: 'Ganancia Acumulada',
+              data: gananciaAcumuladaSerie,
+              type: 'line',
+              fill: false,
+              backgroundColor: 'rgba(241, 196, 15, 0.7)',
+              borderColor: 'rgba(243, 156, 18, 1)',
+              borderWidth: 1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'bottom'
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              title: {
+                display: true,
+                text: 'Capital (CLP)'
+              },
+              ticks: {
+                callback: function(value) {
+                  return '$' + value.toLocaleString();
+                }
+              }
+            }
+          }
+        }
+      });
+
+      const margen = ((precio - costo) / precio * 100).toFixed(1);
+      const ganancia12M = gananciasNetas.reduce((a, b) => a + b, 0);
+      const real12M = gananciaRealMensual.reduce((a, b) => a + b, 0);
+
+      document.getElementById("resumen").innerHTML = `
+        <h3>Resumen Financiero</h3>
+        <p><strong>Margen por cliente:</strong> ${margen}%</p>
+        <p><strong>Ingresos después de gastos (12 meses):</strong> $${ganancia12M.toLocaleString()}</p>
+        <p><strong>Capital disponible (luego de pagarte sueldo):</strong> $${real12M.toLocaleString()} en 12 meses</p>
+        <p><strong>Punto de equilibrio:</strong> ${puntoEquilibrioMes ? `Mes ${puntoEquilibrioMes}` : 'No alcanzado en 12 meses'}</p>
+        <p><strong>Resultado final:</strong> ${real12M >= 0 ? 'GANANCIA ✅' : 'PÉRDIDA ❌'}</p>
+      `;
+
+      const tabla = document.querySelector("#tablaDatos tbody");
+      tabla.innerHTML = "";
+      for (let i = 0; i < meses; i++) {
+        const ingreso = ingresosTotales[i];
+        const costoVariable = clientes * costo;
+        const gasto = costoVariable + fijo;
+        const ganancia = gananciasNetas[i];
+        const real = gananciaRealMensual[i];
+        const acumulado = capitalDisponibleAcumulado[i];
+        const gananciaAcumulada = gananciaAcumuladaSerie[i];
+
+        tabla.innerHTML += `<tr style="text-align:center; border-top: 1px solid #ddd">
+          <td>Mes ${i + 1}</td>
+          <td>$${ingreso.toLocaleString()}</td>
+          <td>$${gasto.toLocaleString()}</td>
+          <td style="color:${ganancia < 0 ? 'red' : 'green'}">$${ganancia.toLocaleString()}</td>
+          <td style="color:${real < 0 ? 'red' : 'green'}">$${real.toLocaleString()}</td>
+          <td>$${acumulado.toLocaleString()}</td>
+          <td>$${gananciaAcumulada.toLocaleString()}</td></tr>`;
+      }
+    }
+
+    calcularYActualizar();
+    document.querySelectorAll("input").forEach(input => {
+      input.addEventListener("input", calcularYActualizar);
+    });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').then(function(registration) {
+        console.log('Service Worker registrado con éxito:', registration);
+      }).catch(function(error) {
+        console.log('Error al registrar Service Worker:', error);
+      });
+    }
+  </script>
+</body>
+</html>
